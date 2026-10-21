@@ -81,3 +81,50 @@ jobs:
         with:
           name: snyk-report
           path: snyk-report.json
+
+  dast:
+    name: dast
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build image
+        run: docker build -t vulnerable-notes .
+
+      - name: Start ephemeral app
+        run: |
+          docker run -d --name notes --network host vulnerable-notes
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5000/ && break || sleep 1
+          done
+          curl -sf -o /dev/null -w "HTTP %{http_code}\n" http://localhost:5000/
+
+      - name: ZAP full scan
+        run: |
+          mkdir -p zap-out && chmod 777 zap-out
+          docker run --rm --network host \
+            -v "$PWD/zap-out":/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py -t http://localhost:5000 \
+              -J zap-report.json -r zap-report.html -I
+
+      - name: ZAP gate (fail on High)
+        run: python .github/scripts/zap_gate.py zap-out/zap-report.json
+
+      - name: App logs and teardown
+        if: always()
+        run: |
+          docker logs notes || true
+          docker rm -f notes || true
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-out/

@@ -27,7 +27,11 @@ def init_db():
 
 @app.route("/")
 def index():
-    return "Notes API: /user?name=…  /hello?name=…"
+    return (
+        "<h1>Notes API</h1>"
+        '<a href="/user?name=admin">user</a> '
+        '<a href="/hello?name=test">hello</a>'
+    )
 
 
 @app.route("/user")
