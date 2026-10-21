@@ -45,3 +45,51 @@ jobs:
         with:
           name: bandit-report
           path: bandit-report.txt
+
+  sca:
+    name: sca
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare folders
+        run: mkdir -p reports .odc-data && chmod -R 777 reports .odc-data
+
+      - name: Restore NVD cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .odc-data
+          key: odc-data-${{ github.run_id }}
+          restore-keys: |
+            odc-data-
+
+      - name: Dependency-Check (fail on CVSS >= 7)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          docker run --rm \
+            -v "$PWD":/src \
+            -v "$PWD/reports":/report \
+            -v "$PWD/.odc-data":/usr/share/dependency-check/data \
+            owasp/dependency-check \
+            --scan /src/requirements.txt \
+            --enableExperimental \
+            --format HTML --format JSON \
+            --out /report \
+            --project vulnerable-notes \
+            --failOnCVSS 7 \
+            --nvdApiKey "$NVD_API_KEY"
+
+      - name: Save NVD cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .odc-data
+          key: odc-data-${{ github.run_id }}
+
+      - name: Upload Dependency-Check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports/
