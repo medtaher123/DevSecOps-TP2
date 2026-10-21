@@ -4,7 +4,7 @@ import os
 import sqlite3
 
 from flask import Flask, request
-from markupsafe import escape
+from markupsafe import Markup, escape
 
 app = Flask(__name__)
 DB = "users.db"
@@ -51,8 +51,13 @@ def hello():
     name = request.args.get("name", "inconnu")
     return f"<h1>Bonjour {escape(name)}</h1>"
 
+@app.route("/echo")
+def echo():
+    q = request.args.get("q", "")
+    return Markup(f"<p>{q}</p>")
+
 
 if __name__ == "__main__":
     init_db()
     host = os.environ.get("APP_HOST", "127.0.0.1")
-    app.run(host=host, port=5000, debug=False)
+    app.run(host=host, port=5000, debug=True)
