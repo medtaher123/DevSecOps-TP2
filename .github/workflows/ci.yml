@@ -49,57 +49,35 @@ jobs:
   sca:
     name: sca
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare folders
-        run: mkdir -p reports .odc-data && chmod -R 777 reports .odc-data
-
-      - name: Restore NVD cache
-        uses: actions/cache/restore@v4
+      - uses: actions/setup-python@v5
         with:
-          path: .odc-data
-          key: odc-data-${{ github.run_id }}
-          restore-keys: |
-            odc-data-
+          python-version: "3.11"
 
-      - name: Check NVD key is present
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+      - name: Install dependencies (required by Snyk for pip projects)
         run: |
-          if [ -n "$NVD_API_KEY" ]; then
-            echo "NVD_API_KEY present (length ${#NVD_API_KEY})"
-          else
-            echo "NVD_API_KEY is EMPTY"
-          fi
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Dependency-Check (fail on CVSS >= 7)
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Snyk SCA (fail on HIGH and CRITICAL)
         env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          docker run --rm \
-            -v "$PWD":/src \
-            -v "$PWD/reports":/report \
-            -v "$PWD/.odc-data":/usr/share/dependency-check/data \
-            owasp/dependency-check \
-            --scan /src/requirements.txt \
-            --enableExperimental \
-            --format HTML --format JSON \
-            --out /report \
-            --project vulnerable-notes \
-            --failOnCVSS 7 \
-            --nvdApiKey "$NVD_API_KEY"
+          snyk test \
+            --file=requirements.txt \
+            --package-manager=pip \
+            --severity-threshold=high \
+            --json-file-output=snyk-report.json
 
-      - name: Save NVD cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: .odc-data
-          key: odc-data-${{ github.run_id }}
-
-      - name: Upload Dependency-Check reports
+      - name: Upload Snyk report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report
-          path: reports/
+          name: snyk-report
+          path: snyk-report.json
