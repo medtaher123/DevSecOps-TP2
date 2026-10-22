@@ -46,10 +46,26 @@ def get_user():
     return {"users": [{"id": r[0], "name": r[1]} for r in rows]}
 
 
+HELLO_PAGE = """<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Notes API - Hello</title>
+</head>
+<body>
+  <main>
+    <h1>Bonjour {name}</h1>
+    <p>Bienvenue sur Notes API.</p>
+  </main>
+</body>
+</html>
+"""
+
+
 @app.route("/hello")
 def hello():
     name = request.args.get("name", "inconnu")
-    return f"<h1>Bonjour {escape(name)}</h1>"
+    return HELLO_PAGE.format(name=escape(name))
 
 @app.route("/echo")
 def echo():
@@ -60,4 +76,4 @@ def echo():
 if __name__ == "__main__":
     init_db()
     host = os.environ.get("APP_HOST", "127.0.0.1")
-    app.run(host=host, port=5000, debug=True)
+    app.run(host=host, port=5000, debug=False)
